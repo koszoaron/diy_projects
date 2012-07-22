@@ -9,6 +9,7 @@
 #include "Arduino.h"
 //add your includes for the project OrionHT550 here
 #include "Encoder.h"
+#include "IRremote.h"
 
 //end of add your includes here
 #ifdef __cplusplus
