@@ -32,5 +32,15 @@
 			<type>2</type>
 			<locationURI>PivateLibPath/Encoder</locationURI>
 		</link>
+		<link>
+			<name>IRremote</name>
+			<type>2</type>
+			<locationURI>PivateLibPath/IRremote</locationURI>
+		</link>
+		<link>
+			<name>Wire</name>
+			<type>2</type>
+			<locationURI>ArduinoLibPath/Wire</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

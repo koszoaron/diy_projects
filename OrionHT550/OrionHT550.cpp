@@ -26,6 +26,7 @@ decode_results results;
 void setup() {
     Serial.begin(9600);
     irReceiver.enableIRIn();
+    Wire.begin();
 
     pinMode(LED_CLK, OUTPUT);
     pinMode(LED_DATA, OUTPUT);
@@ -62,9 +63,9 @@ void displayNumber(uint8_t num) {
 void loop() {
     long encNew = encMain.read();
     if (encNew != encPosition) {
-        if (encNew > encPosition && encNew%4 != 0) {
+        if (encNew > encPosition && encNew % 4 != 0) {
             value++;
-        } else if (encNew < encPosition && encNew%4 != 0) {
+        } else if (encNew < encPosition && encNew % 4 != 0) {
             value--;
         }
 
@@ -87,4 +88,81 @@ void loop() {
     }
 
     displayNumber(value);
+}
+
+void pt2323(byte command) {
+    Wire.beginTransmission(PT2323_ADDRESS);
+    Wire.write(command);
+    Wire.endTransmission();
+}
+
+//------------------------------------------------------------------------------
+// Volume controller IC command set
+//------------------------------------------------------------------------------
+void pt2258(byte command, byte ch)  // send volume level commands
+{
+    byte x10;
+    byte x1;
+
+    if (command >= 10) {
+        x10 = command / 10;        // set decade step
+        x1 = command % 10;       // set step
+    } else                       // set step
+    {
+        x1 = command;
+        x10 = 0;
+    }
+
+    switch (ch)                 // which channel to command
+    {
+        case 0:    // all channels
+            x1 = x1 + 0xe0;
+            x10 = x10 + 0xd0;
+            break;
+
+        case 1:    // channel 1
+            x1 = x1 + 0x90;
+            x10 = x10 + 0x80;
+            break;
+
+        case 2:    // channel 2
+            x1 = x1 + 0x50;
+            x10 = x10 + 0x40;
+            break;
+
+        case 3:    // channel 3
+            x1 = x1 + 0x10;
+            x10 = x10 + 0x00;
+            break;
+
+        case 4:    // channel 4
+            x1 = x1 + 0x30;
+            x10 = x10 + 0x20;
+            break;
+
+        case 5:    // channel 5
+            x1 = x1 + 0x70;
+            x10 = x10 + 0x60;
+            break;
+
+        case 6:    // channel 6
+            x1 = x1 + 0xb0;
+            x10 = x10 + 0xa0;
+            break;
+
+        default:   // mute functions
+            if (command == 0)
+                x10, x1 = 0xf8;   // mute off
+            else
+                x10, x1 = 0xf9;               // mute on
+            break;
+    }
+
+    for (int i = 0; i <= 2; i++)  // repeat 2x (had some unknown issues when transmitted only once)
+            {
+        Wire.beginTransmission(68); // transmit to device 0x88(hex) -> 136(dec)(addressing is 7-bit) -> 136/2
+        Wire.write(x10);             // send decade step
+        Wire.write(x1);              // send step
+        Wire.endTransmission();     // stop transmitting
+    }
 }
