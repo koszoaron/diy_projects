@@ -23,7 +23,7 @@ void setup() {
 
     displayChar();
     delay(1000);
-    initAmp();
+    //initAmp();
 }
 
 void initAmp() {
@@ -62,9 +62,9 @@ void loop() {
     long encNew = encMain.read();
     if (encNew != encPosition) {
         if (encNew > encPosition && encNew % 4 != 0) {
-            increaseVolume();
+            //increaseVolume();
         } else if (encNew < encPosition && encNew % 4 != 0) {
-            decreaseVolume();
+            //decreaseVolume();
         }
 
         encPosition = encNew;
@@ -77,9 +77,9 @@ void loop() {
         Serial.println(results.value, HEX);
 
         if (results.value == IR_VOLDOWN) {
-            decreaseVolume();
+            //decreaseVolume();
         } else if (results.value == IR_VOLUP) {
-            increaseVolume();
+            //increaseVolume();
         }
 
         irReceiver.resume();
@@ -206,4 +206,79 @@ void pt2258(byte channel, byte value) {
         Wire.write(x1);
         Wire.endTransmission();
     }
+}
+
+int readSerialInt() {
+    int res = UNKNOWN_VALUE;
+
+    if (Serial.available() > 0) {
+        char in = Serial.read();
+        res = atoi(&in);
+    }
+
+    return res;
+}
+
+void printSerialPrompt(char* message) {
+    Serial.print(message);
+    Serial.print(" > ");
+}
+
+void printMainMenu() {
+    Serial.println("Orion HT550 serial menu");
+    Serial.println("  1. Input selection");
+    Serial.println("  2. Global volume");
+    Serial.println("  3. Per-speaker volume");
+    Serial.println("  4. Muting");
+    Serial.println("  5. Enhanced surround");
+    Serial.println("  6. Mixed channel boost");
+    Serial.println("  7. EEPROM operations");
+    Serial.println("  8. Stand-by mode");
+    Serial.println("  9. Status report");
+    Serial.println("  0. Quit");
+}
+
+void printInputMenu() {
+    Serial.println("Select the input source:");
+    Serial.println("  1. Stereo");
+    Serial.println("  2. Surround");
+}
+
+void printSpeakersMenu() {
+    Serial.println("Select the speaker:");
+    Serial.println("  1. Front left");
+    Serial.println("  2. Front right");
+    Serial.println("  3. Rear left");
+    Serial.println("  4. Rear right");
+    Serial.println("  5. Center");
+    Serial.println("  6. Subwoofer");
+}
+
+void printEepromMenu() {
+    Serial.println("Select the EEPROM operation:");
+    Serial.println("  1. Store");
+    Serial.println("  2. Restore");
+}
+
+void printStatusMenu() {
+    Serial.print("FL volume: ");
+    Serial.println();
+    Serial.print("FR volume: ");
+    Serial.println();
+    Serial.print("RL volume: ");
+    Serial.println();
+    Serial.print("RR volume: ");
+    Serial.println();
+    Serial.print("CEN volume: ");
+    Serial.println();
+    Serial.print("SW volume: ");
+    Serial.println();
+    Serial.print("Input: ");
+    Serial.println();
+    Serial.print("Muting: ");
+    Serial.println();
+    Serial.print("Enhanced surround: ");
+    Serial.println();
+    Serial.print("Mixed channel boost: ");
+    Serial.println();
 }

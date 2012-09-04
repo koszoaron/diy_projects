@@ -74,6 +74,7 @@
 #define SERIAL_SPEED            9600
 #define INITIAL_ENCODER_POS     -999
 #define INITIAL_GLOBAL_VOLUME   40
+#define UNKNOWN_VALUE           -1
 
 //Arduino pins
 #define ENC_A       2
@@ -129,6 +130,13 @@ extern "C" {
     void setChannelVolume(byte channel, byte volume);
     void pt2323(byte command);
     void pt2258(byte channel, byte value);
+    int readSerialInt();
+    void printSerialPrompt(char* message);
+    void printMainMenu();
+    void printInputMenu();
+    void printSpeakersMenu();
+    void printEepromMenu();
+    void printStatusMenu();
 #ifdef __cplusplus
 } // extern "C"
 #endif
