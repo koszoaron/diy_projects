@@ -2,7 +2,16 @@
 #include "OrionHT550.h"
 
 const byte numbers[10] = { SSEG_0, SSEG_1, SSEG_2, SSEG_3, SSEG_4, SSEG_5, SSEG_6, SSEG_7, SSEG_8, SSEG_9 };
-byte globalVolume = INITIAL_GLOBAL_VOLUME;
+
+byte paramPower = DEFAULT_POWER;
+byte paramVolumes[7] = {DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME};
+byte paramInput = DEFAULT_INPUT;
+byte paramMute = DEFAULT_MUTE;
+byte paramEnhancement = DEFAULT_ENHANCEMENT;
+byte paramMixChBoost = DEFAULT_MIXCH_BOOST;
+int serialBuffer[16] = {'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
+byte serialLength = 0;
+
 long encPosition = INITIAL_ENCODER_POS;
 
 Encoder encMain(ENC_A, ENC_B);
@@ -36,8 +45,7 @@ void initAmp() {
     setSurroundEnhancement(false);
     setMixerChannel6Db(false);
     setMute(false);  //disable muting
-    globalVolume = 39;
-    setGlobalVolume(globalVolume);  //set the volume to the half of the max setting
+    setGlobalVolume(paramVolumes[CHAN_ALL]);  //set the volume to the half of the max setting
 }
 
 void displayChar() {
@@ -46,7 +54,7 @@ void displayChar() {
     shiftOut(LED_DATA, LED_CLK, LSBFIRST, SSEG_DASH);
 }
 
-void displayNumber(uint8_t num) {
+void displayNumber(byte num) {
     digitalWrite(LED_EN2, LOW);
     digitalWrite(LED_EN1, HIGH);
     shiftOut(LED_DATA, LED_CLK, LSBFIRST, numbers[num / 10]);
@@ -85,7 +93,9 @@ void loop() {
         irReceiver.resume();
     }
 
-    displayNumber(globalVolume);
+    displayNumber(paramVolumes[CHAN_ALL]);
+
+    handleSerial();
 }
 
 void setInput(byte input) {
@@ -128,16 +138,16 @@ void setMute(bool mute) {
 }
 
 void increaseVolume() {
-    if (globalVolume < MAX_ATTENUATION) {
-        globalVolume++;
-        setGlobalVolume(globalVolume);
+    if (paramVolumes[CHAN_ALL] < MAX_ATTENUATION) {
+        paramVolumes[CHAN_ALL]++;
+        setGlobalVolume(paramVolumes[CHAN_ALL]);
     }
 }
 
 void decreaseVolume() {
-    if (globalVolume > MIN_ATTENUATION) {
-        globalVolume--;
-        setGlobalVolume(globalVolume);
+    if (paramVolumes[CHAN_ALL] > MIN_ATTENUATION) {
+        paramVolumes[CHAN_ALL]--;
+        setGlobalVolume(paramVolumes[CHAN_ALL]);
     }
 }
 
@@ -200,7 +210,7 @@ void pt2258(byte channel, byte value) {
             break;
     }
 
-    for (int i = 0; i <= 2; i++) { // repeat 2x (had some unknown issues when transmitted only once)
+    for (byte i = 0; i <= 2; i++) { // repeat 2x (had some unknown issues when transmitted only once)
         Wire.beginTransmission(PT2258_ADDRESS);
         Wire.write(x10);
         Wire.write(x1);
@@ -208,77 +218,164 @@ void pt2258(byte channel, byte value) {
     }
 }
 
-int readSerialInt() {
-    int res = UNKNOWN_VALUE;
+void handleSerial() {
+    byte c;
+    bool eol = false;
 
-    if (Serial.available() > 0) {
-        char in = Serial.read();
-        res = atoi(&in);
+    while (Serial.available() > 0) {
+        c = Serial.read();
+        Serial.print(c);
+        if (c == 13 || c == 10 || serialLength >= 16) {
+            Serial.println("EOL");
+            eol = true;
+        } else {
+            serialBuffer[serialLength] = c;
+            serialLength++;
+        }
     }
 
-    return res;
+    if (eol) {
+        bool commandOk = false;
+        if (checkHeader()) {
+            switch (serialBuffer[SERIAL_COMMAND_POS]) {
+                case 'P':
+                    paramPower = (isOn() ? ON : OFF);
+                    commandOk = true;
+                    break;
+                case 'V':
+                    paramVolumes[getChannel()] = getNumber();
+                    commandOk = true;
+                    break;
+                case 'E':
+                    paramEnhancement = (isOn() ? ON : OFF);
+                    commandOk = true;
+                    break;
+                case 'B':
+                    paramMixChBoost = (isOn() ? ON : OFF);
+                    commandOk = true;
+                    break;
+                case 'M':
+                    paramMute = (isOn() ? ON : OFF);
+                    commandOk = true;
+                    break;
+                case 'S':
+                    if (isOn()) {
+                        Serial.println("Store...");
+                        commandOk = true;
+                    }
+                    break;
+                case 'R':
+                    if (isOn()) {
+                        Serial.println("Restore...");
+                        commandOk = true;
+                    }
+                    break;
+                case 'I':
+                    paramInput = (isOn() ? INPUT_SURROUND : INPUT_STEREO);
+                    commandOk = true;
+                    break;
+                case 'D':
+                    printStatus();
+                    commandOk = true;
+                    break;
+                default:
+                    break;
+            }
+
+            if (commandOk) {
+                Serial.println("OK");
+            }
+        }
+
+        clearSerialBuffer();
+        clearSerialConsole();
+    }
 }
 
-void printSerialPrompt(char* message) {
-    Serial.print(message);
-    Serial.print(" > ");
+bool checkHeader() {
+    byte header[] = {'H','T','5','5','0'};
+
+    for (byte i = 0; i < SERIAL_HEADER_LENGTH; i++) {
+        if (serialBuffer[i] != header[i]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
-void printMainMenu() {
-    Serial.println("Orion HT550 serial menu");
-    Serial.println("  1. Input selection");
-    Serial.println("  2. Global volume");
-    Serial.println("  3. Per-speaker volume");
-    Serial.println("  4. Muting");
-    Serial.println("  5. Enhanced surround");
-    Serial.println("  6. Mixed channel boost");
-    Serial.println("  7. EEPROM operations");
-    Serial.println("  8. Stand-by mode");
-    Serial.println("  9. Status report");
-    Serial.println("  0. Quit");
+bool isOn() {
+    if (serialBuffer[SERIAL_VALUE_POS] == '1') {
+        return true;
+    } else {
+        return false;
+    }
 }
 
-void printInputMenu() {
-    Serial.println("Select the input source:");
-    Serial.println("  1. Stereo");
-    Serial.println("  2. Surround");
+byte getChannel() {
+    switch (serialBuffer[SERIAL_VALUE_POS]) {
+        case '0':
+            return CHAN_ALL;
+        case '1':
+            return CHAN_FL;
+        case '2':
+            return CHAN_FR;
+        case '3':
+            return CHAN_RL;
+        case '4':
+            return CHAN_RR;
+        case '5':
+            return CHAN_CEN;
+        case '6':
+            return CHAN_SW;
+    }
+
+    return UNKNOWN_BYTE;
 }
 
-void printSpeakersMenu() {
-    Serial.println("Select the speaker:");
-    Serial.println("  1. Front left");
-    Serial.println("  2. Front right");
-    Serial.println("  3. Rear left");
-    Serial.println("  4. Rear right");
-    Serial.println("  5. Center");
-    Serial.println("  6. Subwoofer");
+byte getNumber() {
+    char value[2] = {(char)serialBuffer[SERIAL_VALUE_POS + 1], (char)serialBuffer[SERIAL_VALUE_POS + 2]};
+    return atoi(value);
 }
 
-void printEepromMenu() {
-    Serial.println("Select the EEPROM operation:");
-    Serial.println("  1. Store");
-    Serial.println("  2. Restore");
-}
-
-void printStatusMenu() {
-    Serial.print("FL volume: ");
-    Serial.println();
-    Serial.print("FR volume: ");
-    Serial.println();
-    Serial.print("RL volume: ");
-    Serial.println();
-    Serial.print("RR volume: ");
-    Serial.println();
-    Serial.print("CEN volume: ");
-    Serial.println();
-    Serial.print("SW volume: ");
-    Serial.println();
+void printStatus() {
+    Serial.print("Power: ");
+    Serial.println(paramPower);
     Serial.print("Input: ");
-    Serial.println();
+    Serial.println(paramInput);
+    Serial.println("Volumes:");
+    Serial.print("  Global: ");
+    Serial.println(paramVolumes[CHAN_ALL]);
+    Serial.print("  Front-Left: ");
+    Serial.println(paramVolumes[CHAN_FL]);
+    Serial.print("  Front-Right: ");
+    Serial.println(paramVolumes[CHAN_FR]);
+    Serial.print("  Rear-Left: ");
+    Serial.println(paramVolumes[CHAN_RL]);
+    Serial.print("  Rear-Right: ");
+    Serial.println(paramVolumes[CHAN_RR]);
+    Serial.print("  Center: ");
+    Serial.println(paramVolumes[CHAN_CEN]);
+    Serial.print("  Subwoofer: ");
+    Serial.println(paramVolumes[CHAN_SW]);
     Serial.print("Muting: ");
-    Serial.println();
-    Serial.print("Enhanced surround: ");
-    Serial.println();
+    Serial.println(paramMute);
+    Serial.print("Enhancement: ");
+    Serial.println(paramEnhancement);
     Serial.print("Mixed channel boost: ");
-    Serial.println();
+    Serial.println(paramMixChBoost);
+}
+
+void clearSerialConsole() {
+    Serial.write(27);
+    Serial.print("[2J");
+    Serial.write(27);
+    Serial.print("[H");
+}
+
+void clearSerialBuffer() {
+    for (byte i = 0; i < 16; i++) {
+        serialBuffer[i] = '\0';
+    }
+    serialLength = 0;
 }

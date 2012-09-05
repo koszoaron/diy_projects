@@ -43,4 +43,10 @@
 			<locationURI>ArduinoLibPath/Wire</locationURI>
 		</link>
 	</linkedResources>
+	<variableList>
+		<variable>
+			<name>PivateLibPath</name>
+			<value>file:/home/aronk/bin/arduino/private_lib</value>
+		</variable>
+	</variableList>
 </projectDescription>
