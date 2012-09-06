@@ -32,7 +32,7 @@ void setup() {
 
     displayChar();
     delay(1000);
-    //initAmp();
+    initAmp();
 }
 
 void initAmp() {
@@ -70,26 +70,19 @@ void loop() {
     long encNew = encMain.read();
     if (encNew != encPosition) {
         if (encNew > encPosition && encNew % 4 != 0) {
-            //increaseVolume();
+            increaseVolume();
         } else if (encNew < encPosition && encNew % 4 != 0) {
-            //decreaseVolume();
+            decreaseVolume();
         }
-
         encPosition = encNew;
-        Serial.print("ENCODER: ");
-        Serial.println(encNew);
     }
 
     if (irReceiver.decode(&results)) {
-        Serial.print("IR: ");
-        Serial.println(results.value, HEX);
-
         if (results.value == IR_VOLDOWN) {
-            //decreaseVolume();
+            decreaseVolume();
         } else if (results.value == IR_VOLUP) {
-            //increaseVolume();
+            increaseVolume();
         }
-
         irReceiver.resume();
     }
 
@@ -140,14 +133,15 @@ void setMute(bool mute) {
 void increaseVolume() {
     if (paramVolumes[CHAN_ALL] < MAX_ATTENUATION) {
         paramVolumes[CHAN_ALL]++;
-        setGlobalVolume(paramVolumes[CHAN_ALL]);
+        //setGlobalVolume(paramVolumes[CHAN_ALL]);
+        setChannelVolume(CHAN_ALL, paramVolumes[CHAN_ALL]);
     }
 }
 
 void decreaseVolume() {
     if (paramVolumes[CHAN_ALL] > MIN_ATTENUATION) {
         paramVolumes[CHAN_ALL]--;
-        setGlobalVolume(paramVolumes[CHAN_ALL]);
+        setChannelVolume(CHAN_ALL, paramVolumes[CHAN_ALL]);
     }
 }
 
@@ -158,7 +152,7 @@ void setGlobalVolume(byte volume) {
 void setChannelVolume(byte channel, byte volume) {
     if (volume >= MIN_ATTENUATION && volume <= MAX_ATTENUATION) {
         byte attenuation = MAX_ATTENUATION - volume;
-        pt2258(CHAN_ALL, attenuation);
+        pt2258(channel, attenuation);
     }
 }
 
@@ -236,26 +230,38 @@ void handleSerial() {
 
     if (eol) {
         bool commandOk = false;
+        byte chan = UNKNOWN_BYTE;
         if (checkHeader()) {
             switch (serialBuffer[SERIAL_COMMAND_POS]) {
                 case 'P':
+                    Serial.print("Power: ");
                     paramPower = (isOn() ? ON : OFF);
                     commandOk = true;
                     break;
                 case 'V':
-                    paramVolumes[getChannel()] = getNumber();
+                    Serial.print("Volume - ");
+                    chan = getChannel();
+                    Serial.print(chan);
+                    paramVolumes[chan] = getNumber();
+                    setChannelVolume(chan, paramVolumes[chan]);
                     commandOk = true;
                     break;
                 case 'E':
+                    Serial.print("Enhancement: ");
                     paramEnhancement = (isOn() ? ON : OFF);
+                    setSurroundEnhancement(paramEnhancement ? true : false);
                     commandOk = true;
                     break;
                 case 'B':
+                    Serial.print("Boost: ");
                     paramMixChBoost = (isOn() ? ON : OFF);
+                    setMixerChannel6Db(paramMixChBoost ? true : false);
                     commandOk = true;
                     break;
                 case 'M':
+                    Serial.print("Mute: ");
                     paramMute = (isOn() ? ON : OFF);
+                    setMute(paramMute ? true : false);
                     commandOk = true;
                     break;
                 case 'S':
@@ -271,7 +277,9 @@ void handleSerial() {
                     }
                     break;
                 case 'I':
+                    Serial.print("Input: ");
                     paramInput = (isOn() ? INPUT_SURROUND : INPUT_STEREO);
+                    setInput(paramInput);
                     commandOk = true;
                     break;
                 case 'D':
@@ -288,7 +296,6 @@ void handleSerial() {
         }
 
         clearSerialBuffer();
-        clearSerialConsole();
     }
 }
 
@@ -306,8 +313,10 @@ bool checkHeader() {
 
 bool isOn() {
     if (serialBuffer[SERIAL_VALUE_POS] == '1') {
+        Serial.print("ON");
         return true;
     } else {
+        Serial.print("OFF");
         return false;
     }
 }
@@ -315,18 +324,25 @@ bool isOn() {
 byte getChannel() {
     switch (serialBuffer[SERIAL_VALUE_POS]) {
         case '0':
+            Serial.print("ALL: ");
             return CHAN_ALL;
         case '1':
+            Serial.print("FL: ");
             return CHAN_FL;
         case '2':
+            Serial.print("FR: ");
             return CHAN_FR;
         case '3':
+            Serial.print("RL: ");
             return CHAN_RL;
         case '4':
+            Serial.print("RR: ");
             return CHAN_RR;
         case '5':
+            Serial.print("CEN: ");
             return CHAN_CEN;
         case '6':
+            Serial.print("SW: ");
             return CHAN_SW;
     }
 
@@ -335,6 +351,7 @@ byte getChannel() {
 
 byte getNumber() {
     char value[2] = {(char)serialBuffer[SERIAL_VALUE_POS + 1], (char)serialBuffer[SERIAL_VALUE_POS + 2]};
+    Serial.println(atoi(value));
     return atoi(value);
 }
 
@@ -346,17 +363,17 @@ void printStatus() {
     Serial.println("Volumes:");
     Serial.print("  Global: ");
     Serial.println(paramVolumes[CHAN_ALL]);
-    Serial.print("  Front-Left: ");
+    Serial.print("  FL: ");
     Serial.println(paramVolumes[CHAN_FL]);
-    Serial.print("  Front-Right: ");
+    Serial.print("  FR: ");
     Serial.println(paramVolumes[CHAN_FR]);
-    Serial.print("  Rear-Left: ");
+    Serial.print("  RL: ");
     Serial.println(paramVolumes[CHAN_RL]);
-    Serial.print("  Rear-Right: ");
+    Serial.print("  RR: ");
     Serial.println(paramVolumes[CHAN_RR]);
-    Serial.print("  Center: ");
+    Serial.print("  CE: ");
     Serial.println(paramVolumes[CHAN_CEN]);
-    Serial.print("  Subwoofer: ");
+    Serial.print("  SW: ");
     Serial.println(paramVolumes[CHAN_SW]);
     Serial.print("Muting: ");
     Serial.println(paramMute);
