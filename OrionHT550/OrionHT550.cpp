@@ -37,14 +37,14 @@ void setup() {
 
 void initAmp() {
     setGlobalVolume(MAX_ATTENUATION);  //set the volume to the lowest setting
-    setMute(true);  //enable muting
+    setMute(ON);  //enable muting
 
 
     delay(2000);  //wait 2 secs for the amp to settle
-    setInput(INPUT_STEREO);  //enable the stereo input
-    setSurroundEnhancement(false);
-    setMixerChannel6Db(false);
-    setMute(false);  //disable muting
+    setInput(DEFAULT_INPUT);  //enable the stereo input
+    setSurroundEnhancement(DEFAULT_ENHANCEMENT);
+    setMixerChannel6Db(DEFAULT_MIXCH_BOOST);
+    setMute(OFF);  //disable muting
     setGlobalVolume(paramVolumes[CHAN_ALL]);  //set the volume to the half of the max setting
 }
 
@@ -102,7 +102,7 @@ void setInput(byte input) {
     }
 }
 
-void setSurroundEnhancement(bool enhancement) {
+void setSurroundEnhancement(byte enhancement) {
     if (enhancement) {
         pt2323(PT2323_SURRENH_ON);
     } else {
@@ -110,7 +110,7 @@ void setSurroundEnhancement(bool enhancement) {
     }
 }
 
-void setMixerChannel6Db(bool mix6db) {
+void setMixerChannel6Db(byte mix6db) {
     if (mix6db) {
         pt2323(PT2323_MIXCHAN_6DB);
     } else {
@@ -118,7 +118,7 @@ void setMixerChannel6Db(bool mix6db) {
     }
 }
 
-void setMute(bool mute) {
+void setMute(byte mute) {
     if (mute) {
         pt2258(CHAN_MUTE, PT2258_ALLCH_MUTE);
         pt2323(PT2323_ALL_MUTE);
@@ -193,7 +193,7 @@ void pt2258(byte channel, byte value) {
             break;
         case CHAN_RR:
             x1 += PT2258_RR_1DB;
-            x10 += PT2258_RL_10DB;
+            x10 += PT2258_RR_10DB;
             break;
         case CHAN_MUTE:
             if (value == 0) {
@@ -204,12 +204,10 @@ void pt2258(byte channel, byte value) {
             break;
     }
 
-    for (byte i = 0; i <= 2; i++) { // repeat 2x (had some unknown issues when transmitted only once)
-        Wire.beginTransmission(PT2258_ADDRESS);
-        Wire.write(x10);
-        Wire.write(x1);
-        Wire.endTransmission();
-    }
+    Wire.beginTransmission(PT2258_ADDRESS);
+    Wire.write(x10);
+    Wire.write(x1);
+    Wire.endTransmission();
 }
 
 void handleSerial() {
@@ -218,9 +216,7 @@ void handleSerial() {
 
     while (Serial.available() > 0) {
         c = Serial.read();
-        Serial.print(c);
         if (c == 13 || c == 10 || serialLength >= 16) {
-            Serial.println("EOL");
             eol = true;
         } else {
             serialBuffer[serialLength] = c;
@@ -234,34 +230,28 @@ void handleSerial() {
         if (checkHeader()) {
             switch (serialBuffer[SERIAL_COMMAND_POS]) {
                 case 'P':
-                    Serial.print("Power: ");
                     paramPower = (isOn() ? ON : OFF);
                     commandOk = true;
                     break;
                 case 'V':
-                    Serial.print("Volume - ");
                     chan = getChannel();
-                    Serial.print(chan);
                     paramVolumes[chan] = getNumber();
                     setChannelVolume(chan, paramVolumes[chan]);
                     commandOk = true;
                     break;
                 case 'E':
-                    Serial.print("Enhancement: ");
                     paramEnhancement = (isOn() ? ON : OFF);
-                    setSurroundEnhancement(paramEnhancement ? true : false);
+                    setSurroundEnhancement(paramEnhancement);
                     commandOk = true;
                     break;
                 case 'B':
-                    Serial.print("Boost: ");
                     paramMixChBoost = (isOn() ? ON : OFF);
-                    setMixerChannel6Db(paramMixChBoost ? true : false);
+                    setMixerChannel6Db(paramMixChBoost);
                     commandOk = true;
                     break;
                 case 'M':
-                    Serial.print("Mute: ");
                     paramMute = (isOn() ? ON : OFF);
-                    setMute(paramMute ? true : false);
+                    setMute(paramMute);
                     commandOk = true;
                     break;
                 case 'S':
@@ -277,7 +267,6 @@ void handleSerial() {
                     }
                     break;
                 case 'I':
-                    Serial.print("Input: ");
                     paramInput = (isOn() ? INPUT_SURROUND : INPUT_STEREO);
                     setInput(paramInput);
                     commandOk = true;
@@ -313,10 +302,8 @@ bool checkHeader() {
 
 bool isOn() {
     if (serialBuffer[SERIAL_VALUE_POS] == '1') {
-        Serial.print("ON");
         return true;
     } else {
-        Serial.print("OFF");
         return false;
     }
 }
@@ -324,25 +311,18 @@ bool isOn() {
 byte getChannel() {
     switch (serialBuffer[SERIAL_VALUE_POS]) {
         case '0':
-            Serial.print("ALL: ");
             return CHAN_ALL;
         case '1':
-            Serial.print("FL: ");
             return CHAN_FL;
         case '2':
-            Serial.print("FR: ");
             return CHAN_FR;
         case '3':
-            Serial.print("RL: ");
             return CHAN_RL;
         case '4':
-            Serial.print("RR: ");
             return CHAN_RR;
         case '5':
-            Serial.print("CEN: ");
             return CHAN_CEN;
         case '6':
-            Serial.print("SW: ");
             return CHAN_SW;
     }
 
@@ -351,7 +331,6 @@ byte getChannel() {
 
 byte getNumber() {
     char value[2] = {(char)serialBuffer[SERIAL_VALUE_POS + 1], (char)serialBuffer[SERIAL_VALUE_POS + 2]};
-    Serial.println(atoi(value));
     return atoi(value);
 }
 

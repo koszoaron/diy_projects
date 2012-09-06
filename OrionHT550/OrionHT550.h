@@ -81,7 +81,7 @@
 //defaults
 #define DEFAULT_POWER       0
 #define DEFAULT_VOLUME      40
-#define DEFAULT_INPUT       0
+#define DEFAULT_INPUT       1
 #define DEFAULT_MUTE        0
 #define DEFAULT_ENHANCEMENT 0
 #define DEFAULT_MIXCH_BOOST 0
@@ -136,9 +136,9 @@ extern "C" {
     void displayChar();
     void displayNumber(uint8_t num);
     void setInput(byte input);
-    void setSurroundEnhancement(bool enhancement);
-    void setMixerChannel6Db(bool mix6db);
-    void setMute(bool mute);
+    void setSurroundEnhancement(byte enhancement);
+    void setMixerChannel6Db(byte mix6db);
+    void setMute(byte mute);
     void increaseVolume();
     void decreaseVolume();
     void setGlobalVolume(byte volume);
