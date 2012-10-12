@@ -39,6 +39,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/IRremote}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire/utility}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/EEPROM}&quot;"/>
 								</option>
 								<inputType id="it.baeyens.avreclipse.tool.assembler.input.237159600" superClass="it.baeyens.avreclipse.tool.assembler.input"/>
 							</tool>
@@ -53,6 +54,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/IRremote}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire/utility}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/EEPROM}&quot;"/>
 								</option>
 								<option id="it.baeyens.avreclipse.compiler.option.def.1485111403" name="Define Syms (-D)" superClass="it.baeyens.avreclipse.compiler.option.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__IN_ECLIPSE__=1"/>
@@ -77,6 +79,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/IRremote}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/Wire/utility}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/OrionHT550/EEPROM}&quot;"/>
 								</option>
 								<option id="it.baeyens.avreclipse.cppcompiler.option.def.479432623" name="Define Syms (-D)" superClass="it.baeyens.avreclipse.cppcompiler.option.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__IN_ECLIPSE__=1"/>
@@ -113,7 +116,8 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="Release/Wire/utility|IRremote|Wire|Encoder" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="EEPROM|Release/Wire/utility|IRremote|Wire|Encoder" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="?xamples/*" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="EEPROM"/>
 						<entry excluding="?xamples/*" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Encoder"/>
 						<entry excluding="?xamples/*" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="IRremote"/>
 						<entry excluding="?xamples/*" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Wire"/>
@@ -138,8 +142,10 @@
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="it.baeyens.avreclipse.core.AVRGCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="refreshScope" versionNumber="1">
-		<resource resourceType="PROJECT" workspacePath="/secondEclipseTest"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/secondEclipseTest"/>
+		</configuration>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>

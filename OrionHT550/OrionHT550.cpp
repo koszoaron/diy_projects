@@ -4,11 +4,13 @@
 const byte numbers[10] = { SSEG_0, SSEG_1, SSEG_2, SSEG_3, SSEG_4, SSEG_5, SSEG_6, SSEG_7, SSEG_8, SSEG_9 };
 
 byte paramPower = DEFAULT_POWER;
-byte paramVolumes[7] = {DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME, DEFAULT_VOLUME};
 byte paramInput = DEFAULT_INPUT;
 byte paramMute = DEFAULT_MUTE;
 byte paramEnhancement = DEFAULT_ENHANCEMENT;
 byte paramMixChBoost = DEFAULT_MIXCH_BOOST;
+byte paramMainVolume = DEFAULT_VOLUME;
+byte paramVolumeOffsets[6] = {DEFAULT_OFFSET, DEFAULT_OFFSET, DEFAULT_OFFSET, DEFAULT_OFFSET, DEFAULT_OFFSET, DEFAULT_OFFSET};
+
 int serialBuffer[16] = {'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'};
 byte serialLength = 0;
 
@@ -29,6 +31,7 @@ void setup() {
     pinMode(LED_EN1, OUTPUT);
     pinMode(LED_EN2, OUTPUT);
     pinMode(MUTE_NEG, OUTPUT);
+    pinMode(ONBOARD_LED, OUTPUT);
 
     displayChar();
     delay(1000);
@@ -36,16 +39,21 @@ void setup() {
 }
 
 void initAmp() {
-    setGlobalVolume(MAX_ATTENUATION);  //set the volume to the lowest setting
-    setMute(ON);  //enable muting
+    /* mute all channels */
+    setMute(ON);
 
+    /* wait 2 seconds for the amp to settle
+     * meanwhile load all parameters from EEPROM */
+    restoreParameters();
+    delay(2000);
 
-    delay(2000);  //wait 2 secs for the amp to settle
-    setInput(DEFAULT_INPUT);  //enable the stereo input
-    setSurroundEnhancement(DEFAULT_ENHANCEMENT);
-    setMixerChannel6Db(DEFAULT_MIXCH_BOOST);
-    setMute(OFF);  //disable muting
-    setGlobalVolume(paramVolumes[CHAN_ALL]);  //set the volume to the half of the max setting
+    /* set the states defined in the parameters */
+    setInput(paramInput);
+    setSurroundEnhancement(paramEnhancement);
+    setMixerChannel6Db(paramMixChBoost);
+    setMute(paramMute);
+
+    applyGlobalVolume();
 }
 
 void displayChar() {
@@ -78,15 +86,11 @@ void loop() {
     }
 
     if (irReceiver.decode(&results)) {
-        if (results.value == IR_VOLDOWN) {
-            decreaseVolume();
-        } else if (results.value == IR_VOLUP) {
-            increaseVolume();
-        }
+        handleInfrared(results.value);
         irReceiver.resume();
     }
 
-    displayNumber(paramVolumes[CHAN_ALL]);
+    displayNumber(paramMainVolume);
 
     handleSerial();
 }
@@ -131,22 +135,30 @@ void setMute(byte mute) {
 }
 
 void increaseVolume() {
-    if (paramVolumes[CHAN_ALL] < MAX_ATTENUATION) {
-        paramVolumes[CHAN_ALL]++;
-        //setGlobalVolume(paramVolumes[CHAN_ALL]);
-        setChannelVolume(CHAN_ALL, paramVolumes[CHAN_ALL]);
+    if (paramMainVolume < MAX_ATTENUATION) {
+        paramMainVolume++;
+        applyGlobalVolume();
     }
 }
 
 void decreaseVolume() {
-    if (paramVolumes[CHAN_ALL] > MIN_ATTENUATION) {
-        paramVolumes[CHAN_ALL]--;
-        setChannelVolume(CHAN_ALL, paramVolumes[CHAN_ALL]);
+    if (paramMainVolume > MIN_ATTENUATION) {
+        paramMainVolume--;
+        applyGlobalVolume();
     }
 }
 
-void setGlobalVolume(byte volume) {
-    setChannelVolume(CHAN_ALL, volume);
+void applyGlobalVolume() {
+    for (byte i = OFFSET_FL; i <= OFFSET_SW; i++) {
+        int channelVolume = paramMainVolume + paramVolumeOffsets[i] - VOLUME_OFFSET_HALF;
+        if (channelVolume < MIN_ATTENUATION) {
+            channelVolume = MIN_ATTENUATION;
+        }
+        if (channelVolume > MAX_ATTENUATION) {
+            channelVolume = MAX_ATTENUATION;
+        }
+        setChannelVolume(i+1, channelVolume);
+    }
 }
 
 void setChannelVolume(byte channel, byte volume) {
@@ -235,8 +247,12 @@ void handleSerial() {
                     break;
                 case 'V':
                     chan = getChannel();
-                    paramVolumes[chan] = getNumber();
-                    setChannelVolume(chan, paramVolumes[chan]);
+                    if (chan == CHAN_ALL) {  //mainVolume is between 0 and 79
+                        paramMainVolume = getNumber();
+                    } else {  //channel offset is between 0 and 30 - translate this to -15 and 15
+                        paramVolumeOffsets[chan-1] = getNumber();
+                    }
+                    applyGlobalVolume();
                     commandOk = true;
                     break;
                 case 'E':
@@ -256,13 +272,16 @@ void handleSerial() {
                     break;
                 case 'S':
                     if (isOn()) {
-                        Serial.println("Store...");
+                        Serial.print("Store... ");
+                        storeParameters();
                         commandOk = true;
                     }
                     break;
                 case 'R':
                     if (isOn()) {
-                        Serial.println("Restore...");
+                        Serial.print("Restore... ");
+                        restoreParameters();
+                        applyGlobalVolume();
                         commandOk = true;
                     }
                     break;
@@ -285,6 +304,37 @@ void handleSerial() {
         }
 
         clearSerialBuffer();
+    }
+}
+
+void handleInfrared(unsigned long decodedValue) {
+    blinkLed();
+    switch (decodedValue) {
+        case IR_VOLDOWN:
+            decreaseVolume();
+            break;
+        case IR_VOLUP:
+            increaseVolume();
+            break;
+        case IR_POWER:
+            paramMute = (paramMute ? OFF : ON);
+            setMute(paramMute);
+            break;
+        case IR_INPUTSEL:
+            paramInput = (paramInput ? INPUT_STEREO : INPUT_SURROUND);
+            setInput(paramInput);
+            break;
+        case IR_RESET:  //restore from EEPROM
+            restoreParameters();
+            break;
+        case IR_BASSDOWN:  //toggle enhancement
+            paramEnhancement = (paramEnhancement ? OFF : ON);
+            setSurroundEnhancement(paramEnhancement);
+            break;
+        case IR_BASSUP:  //toggle mixchboost
+            paramMixChBoost = (paramMixChBoost ? OFF : ON);
+            setMixerChannel6Db(paramMixChBoost);
+            break;
     }
 }
 
@@ -339,21 +389,21 @@ void printStatus() {
     Serial.println(paramPower);
     Serial.print("Input: ");
     Serial.println(paramInput);
-    Serial.println("Volumes:");
-    Serial.print("  Global: ");
-    Serial.println(paramVolumes[CHAN_ALL]);
+    Serial.print("Main volume: ");
+    Serial.println(paramMainVolume);
+    Serial.println("Volume offsets [0-30]: ");
     Serial.print("  FL: ");
-    Serial.println(paramVolumes[CHAN_FL]);
+    Serial.println(paramVolumeOffsets[OFFSET_FL] - VOLUME_OFFSET_HALF);
     Serial.print("  FR: ");
-    Serial.println(paramVolumes[CHAN_FR]);
+    Serial.println(paramVolumeOffsets[OFFSET_FR] - VOLUME_OFFSET_HALF);
     Serial.print("  RL: ");
-    Serial.println(paramVolumes[CHAN_RL]);
+    Serial.println(paramVolumeOffsets[OFFSET_RL] - VOLUME_OFFSET_HALF);
     Serial.print("  RR: ");
-    Serial.println(paramVolumes[CHAN_RR]);
+    Serial.println(paramVolumeOffsets[OFFSET_RR] - VOLUME_OFFSET_HALF);
     Serial.print("  CE: ");
-    Serial.println(paramVolumes[CHAN_CEN]);
+    Serial.println(paramVolumeOffsets[OFFSET_CEN] - VOLUME_OFFSET_HALF);
     Serial.print("  SW: ");
-    Serial.println(paramVolumes[CHAN_SW]);
+    Serial.println(paramVolumeOffsets[OFFSET_SW] - VOLUME_OFFSET_HALF);
     Serial.print("Muting: ");
     Serial.println(paramMute);
     Serial.print("Enhancement: ");
@@ -374,4 +424,38 @@ void clearSerialBuffer() {
         serialBuffer[i] = '\0';
     }
     serialLength = 0;
+}
+
+void storeParameters() {
+    EEPROM.write(ADDR_INPUT, paramInput);
+    EEPROM.write(ADDR_MUTE, paramMute);
+    EEPROM.write(ADDR_ENHANCEMENT, paramEnhancement);
+    EEPROM.write(ADDR_MIXCHBOOST, paramMixChBoost);
+    EEPROM.write(ADDR_MAINVOLUME, paramMainVolume);
+    EEPROM.write(ADDR_OFFSET_FL, paramVolumeOffsets[OFFSET_FL]);
+    EEPROM.write(ADDR_OFFSET_FR, paramVolumeOffsets[OFFSET_FR]);
+    EEPROM.write(ADDR_OFFSET_RL, paramVolumeOffsets[OFFSET_RL]);
+    EEPROM.write(ADDR_OFFSET_RR, paramVolumeOffsets[OFFSET_RR]);
+    EEPROM.write(ADDR_OFFSET_CEN, paramVolumeOffsets[OFFSET_CEN]);
+    EEPROM.write(ADDR_OFFSET_SUB, paramVolumeOffsets[OFFSET_SW]);
+}
+
+void restoreParameters() {
+    paramInput = EEPROM.read(ADDR_INPUT);
+    paramMute = EEPROM.read(ADDR_MUTE);
+    paramEnhancement = EEPROM.read(ADDR_ENHANCEMENT);
+    paramMixChBoost = EEPROM.read(ADDR_MIXCHBOOST);
+    paramMainVolume = EEPROM.read(ADDR_MAINVOLUME);
+    paramVolumeOffsets[OFFSET_FL] = EEPROM.read(ADDR_OFFSET_FL);
+    paramVolumeOffsets[OFFSET_FR] = EEPROM.read(ADDR_OFFSET_FR);
+    paramVolumeOffsets[OFFSET_RL] = EEPROM.read(ADDR_OFFSET_RL);
+    paramVolumeOffsets[OFFSET_RR] = EEPROM.read(ADDR_OFFSET_RR);
+    paramVolumeOffsets[OFFSET_CEN] = EEPROM.read(ADDR_OFFSET_CEN);
+    paramVolumeOffsets[OFFSET_SW] = EEPROM.read(ADDR_OFFSET_SUB);
+}
+
+void blinkLed() {
+    digitalWrite(ONBOARD_LED, HIGH);
+    delay(50);
+    digitalWrite(ONBOARD_LED, LOW);
 }

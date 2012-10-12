@@ -12,6 +12,7 @@
 #include "IRremote.h"
 #include "Wire.h"
 #include "twi.h"
+#include "EEPROM.h"
 
 //pt2323 definitions
 #define PT2323_ADDRESS      74
@@ -67,6 +68,12 @@
 #define CHAN_CEN    5
 #define CHAN_SW     6
 #define CHAN_MUTE   7
+#define OFFSET_FL   0
+#define OFFSET_FR   1
+#define OFFSET_RL   2
+#define OFFSET_RR   3
+#define OFFSET_CEN  4
+#define OFFSET_SW   5
 #define INPUT_STEREO    0
 #define INPUT_SURROUND  1
 #define MIN_ATTENUATION         0
@@ -77,10 +84,12 @@
 #define UNKNOWN_BYTE            99
 #define ON  1
 #define OFF 0
+#define VOLUME_OFFSET_HALF  15
 
 //defaults
 #define DEFAULT_POWER       0
 #define DEFAULT_VOLUME      40
+#define DEFAULT_OFFSET      VOLUME_OFFSET_HALF
 #define DEFAULT_INPUT       1
 #define DEFAULT_MUTE        0
 #define DEFAULT_ENHANCEMENT 0
@@ -101,6 +110,7 @@
 #define LED_EN2     9
 #define BTN_COM     11
 #define MUTE_NEG    12
+#define ONBOARD_LED 13
 
 //Infrared codes
 #define IR_VOLDOWN  0x1FE50AF
@@ -126,6 +136,19 @@
 #define SSEG_DASH   B11111110
 #define SSEG_DOT    B01000000
 
+//EEPROM addresses
+#define ADDR_INPUT          0
+#define ADDR_MUTE           1
+#define ADDR_ENHANCEMENT    2
+#define ADDR_MIXCHBOOST     3
+#define ADDR_MAINVOLUME     4
+#define ADDR_OFFSET_FL      5
+#define ADDR_OFFSET_FR      6
+#define ADDR_OFFSET_RL      7
+#define ADDR_OFFSET_RR      8
+#define ADDR_OFFSET_CEN     9
+#define ADDR_OFFSET_SUB     10
+
 //end of add your includes here
 #ifdef __cplusplus
 extern "C" {
@@ -141,11 +164,12 @@ extern "C" {
     void setMute(byte mute);
     void increaseVolume();
     void decreaseVolume();
-    void setGlobalVolume(byte volume);
+    void applyGlobalVolume();
     void setChannelVolume(byte channel, byte volume);
     void pt2323(byte command);
     void pt2258(byte channel, byte value);
     void handleSerial();
+    void handleInfrared(unsigned long decodedValue);
     bool checkHeader();
     bool isOn();
     byte getChannel();
@@ -153,6 +177,9 @@ extern "C" {
     void printStatus();
     void clearSerialConsole();
     void clearSerialBuffer();
+    void storeParameters();
+    void restoreParameters();
+    void blinkLed();
 #ifdef __cplusplus
 } // extern "C"
 #endif
